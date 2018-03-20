@@ -1,0 +1,8 @@
+*.db
+Debug
+Lib
+x64
+*.sln
+*.opendb
+.vs
+Include
