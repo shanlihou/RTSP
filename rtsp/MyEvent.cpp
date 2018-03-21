@@ -5,7 +5,7 @@
 #include <algorithm>
 #include "MyEvent.h"
 #include "event2/buffer.h"
-#define RECV_BUF_SIZE 1024
+#define RECV_BUF_SIZE 4096
 MyEvent *MyEvent::instance = NULL;
 MyEvent *MyEvent::getInstance()
 {
@@ -130,14 +130,24 @@ void udp_read(evutil_socket_t fd, short what, void *arg)
     memset(&clientAddr, 0, sizeof(sockaddr_in));
     int clientLen = sizeof(sockaddr);
     char buf[RECV_BUF_SIZE];
-    int len = recvfrom(fd, buf, RECV_BUF_SIZE - 1, 0, (sockaddr *)&clientAddr, &clientLen);
-	printf("len is :%d\n", len);
-	if (len == -1)
+	while(1)
 	{
-		return;
+		u_long mode;
+		ioctlsocket(fd, FIONREAD, &mode);
+		//printf("mode is :%d\n", mode);
+		if (mode == 0)
+		{
+			break;
+		}
+		int len = recvfrom(fd, buf, RECV_BUF_SIZE - 1, 0, (sockaddr *)&clientAddr, &clientLen);
+		//printf("len is :%d\n", len);
+		if (len == -1 || len == 0)
+		{
+			return;
+		}
+		std::string data(buf, len);
+		(*((CallBack *)arg))(data);
 	}
-	std::string data(buf, len);
-    (*((CallBack *)arg))(data);
 }
 
 void MyEvent::detachSock(evutil_socket_t sock)
@@ -147,7 +157,7 @@ void MyEvent::detachSock(evutil_socket_t sock)
 
 void timeout_cb(evutil_socket_t fd, short what, void *arg)
 {
-
+    (*((CallBack *)arg))("");
 }
 
 void closeEvent(event *ev)
@@ -159,12 +169,13 @@ void closeEvent(event *ev)
 event *MyEvent::addTimer(UINT32 sec, void *func)
 {
 	event *ev;
-	ev = evsignal_new(base, -1, timeout_cb, NULL);
+	//ev = evsignal_new(base, -1, timeout_cb, NULL)
+    ev = event_new(base, -1, EV_PERSIST, timeout_cb, func);
 	timeval tv;
 	evutil_timerclear(&tv);
 	tv.tv_sec = sec;
 	tv.tv_usec = 0;
-	event_add(ev, NULL);
+	event_add(ev, &tv);
 	return ev;
 }
 

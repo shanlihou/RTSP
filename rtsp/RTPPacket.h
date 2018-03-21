@@ -13,6 +13,7 @@ struct RTPPacket
 	UINT32 timeStamp;
 	UINT32 ssrc;
 	std::string payload;
+	std::string data;
 	RTPPacket(){};
 	//RTPPacket(RTPPacket &&t){};
 	friend bool operator > (const RTPPacket &r1, const RTPPacket &r2)
