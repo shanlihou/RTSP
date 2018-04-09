@@ -62,12 +62,12 @@ void RTP::timerFunc()
 			fwrite(head, sizeof(head), 1, fw.get());
             fwrite(tmp.payload.c_str(), tmp.payload.length(), 1, fw.get());
 			fprintf(fp, "pt:%d, ssrc:%x, seq:%d, time:%u, pay len:%d\n", tmp.PT, tmp.ssrc, tmp.seqNum, tmp.timeStamp, tmp.payload.length());
-			
+			/*
 			char buf[50];
 			sprintf(buf, "D:\\RTPPacket\\%d.txt", tmp.seqNum);
 			FILE *fPack = fopen(buf, "w");
 			fwrite(tmp.data.c_str(), tmp.data.length(), 1, fPack);
-			fclose(fPack);
+			fclose(fPack);*/
         }
 		fclose(fp);
         fw.reset();
@@ -86,7 +86,7 @@ void RTP::processData(std::string data)
 	//printf("data len:%d\n", data.length());
 	RTPPacket rPack;
 	memcpy((void *)&rPack, data.c_str(), RTP_HEADER_SIZE);
-	rPack.data = data;
+	//rPack.data = data;
 	rPack.payload = data.substr(RTP_HEADER_SIZE);
 	rPack.seqNum = swap(rPack.seqNum);
 	rtpPackets.push(std::move(rPack));

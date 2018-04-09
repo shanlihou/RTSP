@@ -34,7 +34,7 @@ static void signal_cb(evutil_socket_t sig, short events, void *user_data)
 {
     struct event_base *base = (struct event_base *)user_data;
     struct timeval delay = { 2, 0 };
-
+    printf("get signal\n");
     event_base_loopexit(base, &delay);
 }
 
