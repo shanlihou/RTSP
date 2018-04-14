@@ -8,3 +8,5 @@ x64
 Include
 *.vcxproj
 *.filters
+*.dll
+*.264

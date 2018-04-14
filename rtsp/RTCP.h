@@ -4,6 +4,7 @@ class RTCP :public UDP
 {
 public:
     RTCP(UINT32 srcPort, const char *dstAddr, UINT32 dstPort);
+	void processData(std::string data) override;
 private:
     RTP rtp;
 };
