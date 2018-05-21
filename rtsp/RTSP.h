@@ -7,7 +7,7 @@
 #include "RTCP.h"
 
 typedef std::function<void(std::string)> DataFunc;
-typedef std::vector<std::string> STR_LIST;
+typedef std::vector<std::string> STR_VEC;
 class Track
 {
 public:
@@ -28,7 +28,7 @@ public:
 	void connect();
 	void processData(std::string data);
 	void *attachFunc();
-	void post(const char *method, const char *urlExt, STR_LIST headers);
+	void post(const char *method, const char *urlExt, STR_VEC headers);
 	int getCode(std::string::const_iterator &iter);
 	Track getTrack(std::string data);
 	std::string getStr(const std::string &data, const char *start, const char *end);
@@ -38,7 +38,7 @@ public:
 	void PLAY(std::string &data);
 	~RTSP();
 private:
-	STR_LIST split(const std::string &data, const char *sp);
+	STR_VEC split(const std::string &data, const char *sp);
 
 	UINT32 cseq;
 	UINT32 step;

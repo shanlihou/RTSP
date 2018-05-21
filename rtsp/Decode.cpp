@@ -4,10 +4,13 @@
 #include "Decode.h"
 #include "Display.h"
 #define FF_INPUT_BUFFER_PADDING_SIZE 64
+#define MIN_PICT_LENGTH 50
+
 extern void testPict(int argc,char *argv[], int width, int height, void *bitmap);
 PATTERN_SINGLETON_IMPLEMENT(Decode)
 Decode::Decode():pCodecCtx(nullptr), pCodec(nullptr), codec_id(AV_CODEC_ID_H264), pCodecParserCtx(nullptr), pFrame(nullptr), pSwsCtx(nullptr), is_first_time(true)
 {
+	mMutex = CreateMutex(NULL, FALSE, NULL);
 }
 Decode::~Decode()
 {
@@ -60,7 +63,7 @@ void Decode::init()
 int Decode::parse(const UINT8 *in_buffer, UINT32 size)
 {
 	const UINT8 *cur_ptr = in_buffer; 
-	printf("cur_size:%d\n", size);
+	//printf("cur_size:%d\n", size);
 	int ret;
 	int got;
 	int retValue = 0;
@@ -116,13 +119,16 @@ int Decode::parse(const UINT8 *in_buffer, UINT32 size)
 				imgPtr[i * 3 + 1] = ptr[i * 4 + 1];
 				imgPtr[i * 3 + 2] = ptr[i * 4 + 2];
 			}
-			pict.data.reset(imgPtr);
+			pict.data = std::shared_ptr<UINT8> (imgPtr, std::default_delete<UINT8[]>());
+			//pict.data.reset(imgPtr);
 			pict.width = pCodecCtx->width;
 			pict.height = pCodecCtx->height; 
-			Display::getInstance()->pushBackPict(pict);
+			//Display::getInstance()->pushBackPict(pict);
+			mPictList.push_back(std::move(pict));
 
-			//std::unique_ptr<FILE, decltype(fclose)*> fp(fopen("D:\\picture.txt", "wb"), fclose);
-			//fwrite(picture.data[0], );
+			/*std::unique_ptr<FILE, decltype(fclose)*> fp(fopen("D:\\picture.txt", "wb"), fclose);
+			fwrite(imgPtr, pict.width * pict.height * 3, 1, fp.get());*/
+			//return 1;
 			//QImage img(picture.data[0], pCodecCtx->width, pCodecCtx->height, QImage::Format_RGB32);  
 
 			//emit this->signal_receive_one_image(img); 
@@ -132,27 +138,39 @@ int Decode::parse(const UINT8 *in_buffer, UINT32 size)
 	}  
 	return retValue;
 }
-/*
-void test()
-{  
 
-	int ret;    
-
-	while (exitFlag)  
-	{  
-		std::unique_ptr<FILE, decltype(fclose)*> fp(fopen("D:\\eclipse\\live555-master\\live555-master\\mediaServer\\mediaServer\\test.264", "rb"), fclose);
-		cur_size = fread(in_buffer, in_buffer_size, 2, fp.get());  
-		if (cur_size != 2)  
-			break;  
-		cur_size *= in_buffer_size;
-
-		 
-			
-	}  
-}*/
-void Decode::onData(std::string data)
+void Decode::onData(std::string &data)
 {
-	parse((UINT8 *)data.c_str(), data.length());
+	//parse((UINT8 *)data.c_str(), data.length());
+	WaitForSingleObject(mMutex, INFINITE);
+	mOriList.push_back(std::move(data));
+	dealAllQueue();
+	ReleaseMutex(mMutex);
+}
+
+void Decode::dealAllQueue()
+{
+	while(mPictList.size() < MIN_PICT_LENGTH && (!mOriList.empty()))
+	{
+		std::string &first = mOriList.front();
+		parse((UINT8 *)first.c_str(), first.length());
+		mOriList.pop_front();
+	}
+}
+int Decode::pop(MyPicture &pict)
+{
+	WaitForSingleObject(mMutex, INFINITE);
+	if (mPictList.empty())
+	{
+		ReleaseMutex(mMutex);
+		return -1;
+	}
+	//pict = mPictList.front();
+	pict = std::move(mPictList.front());
+	mPictList.pop_front();
+	dealAllQueue();
+	ReleaseMutex(mMutex);
+	return 0;
 }
 
 #define BUFF_SIZE 4096
@@ -168,10 +186,32 @@ int testffmpeg()
 		int size = fread(in_buffer, BUFF_SIZE, 1, fp.get());
 		if (size != 1)
 			break;
-		int ret = Decode::getInstance()->parse(in_buffer, size * BUFF_SIZE);
-		//if (ret == 1)
-			//break;
+		std::string tmpData((char *)in_buffer, size * BUFF_SIZE);
+		Decode::getInstance()->onData(tmpData);
+		//int ret = Decode::getInstance()->parse(in_buffer, size * BUFF_SIZE);
+		/*if (ret == 1)
+			break;*/
 	}
 	getchar();
 	return 0;
+}
+
+
+
+MyPicture::MyPicture()
+{
+}
+MyPicture::MyPicture(MyPicture &&pict)
+{
+	this->width = pict.width;
+	this->height = pict.height;
+	this->data = pict.data;
+}
+
+MyPicture &MyPicture::operator =(MyPicture &pict)
+{
+	this->width = pict.width;
+	this->height = pict.height;
+	this->data = std::move(pict.data);
+	return *this;
 }

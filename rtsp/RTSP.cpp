@@ -64,11 +64,11 @@ int RTSP::getCode(std::string::const_iterator &iter)
 	return code;
 }
 
-STR_LIST RTSP::split(const std::string &data, const char *sp)
+STR_VEC RTSP::split(const std::string &data, const char *sp)
 {
 	UINT32 start = 0;
 	UINT32 end = 0;
-	STR_LIST retList;
+	STR_VEC retList;
 	while((end = data.find(sp, start)) != -1)
 	{
 		retList.push_back(data.substr(start, end - start));
@@ -88,7 +88,7 @@ std::string RTSP::getStr(const std::string &data, const char *start, const char 
 Track RTSP::getTrack(std::string data)
 {
 	UINT32 firstEnter = data.find("\r");
-	STR_LIST firstList = split(data.substr(0, firstEnter), " ");
+	STR_VEC firstList = split(data.substr(0, firstEnter), " ");
 	printf("trans:%s\n", firstList[2].c_str());
 	return Track(getStr(data, "a=control:", "\r").c_str(), firstList[2].c_str());
 	//return ret;
@@ -115,7 +115,7 @@ void RTSP::connect()
 {
 	mBev = MyEvent::getInstance()->connect(host.c_str(), port, attachFunc());
 }
-std::string join(STR_LIST list, const char *add)
+std::string join(STR_VEC list, const char *add)
 {
 	std::string ret("");
 	std::vector<std::string>::iterator itr;
@@ -128,9 +128,9 @@ std::string join(STR_LIST list, const char *add)
 	return ret;
 }
 
-void RTSP::post(const char *method, const char *urlExt, STR_LIST headers)
+void RTSP::post(const char *method, const char *urlExt, STR_VEC headers)
 {
-	STR_LIST postList;
+	STR_VEC postList;
 	char buf[296];
 	buf[sizeof(buf) - 1] = 0;
     if (*urlExt != 0)
@@ -154,13 +154,13 @@ void RTSP::post(const char *method, const char *urlExt, STR_LIST headers)
 
 void RTSP::OPTIONS(std::string &data)
 {
-	STR_LIST nothing;
+	STR_VEC nothing;
 	post("OPTIONS", "", nothing);
 }
 
 void RTSP::DESCRIBE(std::string &data)
 {
-	STR_LIST headers;
+	STR_VEC headers;
 	headers.push_back("Accept: application/sdp");
 	post("DESCRIBE", "", headers);
 }
@@ -169,9 +169,9 @@ void RTSP::SETUP(std::string &data)
 {
 	printf("im in setup\n");
 
-	STR_LIST trackList = split(data, "m=");
+	STR_VEC trackList = split(data, "m=");
 	std::for_each(trackList.begin() + 1, trackList.end(), [=](std::string x){
-		STR_LIST headers;
+		STR_VEC headers;
 		char buf[296];
 		buf[sizeof(buf) - 1] = 0;
 
@@ -194,7 +194,7 @@ void RTSP::PLAY(std::string &data)
 	
 	//start play
 	
-	STR_LIST headers;
+	STR_VEC headers;
 	headers.push_back("Range: npt=0.000-");
 	post("PLAY", "", headers);
 }

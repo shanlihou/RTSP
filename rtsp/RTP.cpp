@@ -9,6 +9,7 @@ UDP::UDP(UINT32 srcPort, const char *dstAddr, UINT32 dstPort):dstAddr(dstAddr), 
     sock = MyEvent::getInstance()->bindUdp(srcPort, getCallBack());
     char data[] = { 0xce, 0xfa, 0xed, 0xfe , 0};
     std::string sendMsg(data);
+	this->dstAddr = dstAddr;
 	printf("sendMsg len:%d\n", sendMsg.length());
     MyEvent::getInstance()->sendTo(sock, dstAddr, dstPort, sendMsg);
     MyEvent::getInstance()->sendTo(sock, dstAddr, dstPort, sendMsg);
@@ -24,7 +25,7 @@ void UDP::attach(Proc proc)
 	mVProc.push_back(proc);
 }
 
-void UDP::notifyProc(std::string data)
+void UDP::notifyProc(std::string &data)
 {
 	for (auto proc = mVProc.begin(); proc != mVProc.end(); proc++)
 	{
@@ -50,6 +51,9 @@ RTP::RTP(UINT32 srcPort, const char *dstAddr, UINT32 dstPort)
 	Decode *decode = Decode::getInstance();
 	Decode::getInstance()->init();
 	attach(std::bind(&Decode::onData, decode, std::placeholders::_1));
+	count = 0;
+	highSeq = 0;
+	highTimeStamp = 0;
 };
 
 void *RTP::createTimerFunc()
@@ -93,11 +97,19 @@ std::string RTP::parseNalU(std::string FU_A)
 
 void RTP::timerFunc()
 {
-    static UINT32 packetSize = -1;
-	printf("im in time ps:%d, packets:%d\n", packetSize, rtpPackets.size());
-    if (packetSize != rtpPackets.size())
+    static UINT32 lastHighSeq = -1;
+	printf("im in time ps:%d, packets:%d\n", lastHighSeq, rtpPackets.size());
+    if (lastHighSeq != highSeq)
     {
-        packetSize = rtpPackets.size();
+		RTPPacket tmp;
+        lastHighSeq = highSeq;
+		while((!rtpPackets.empty()) && (highTimeStamp - rtpPackets.top().timeStamp > 20000))
+		{
+            tmp = rtpPackets.top();
+			rtpPackets.pop();
+			std::string data = parseNalU(tmp.payload);
+			notifyProc(data);
+		}
     }
     else
     {
@@ -134,11 +146,6 @@ void RTP::timerFunc()
     }
 }
 
-inline UINT16 swap(UINT16 num)
-{
-	return (num >> 8) | (num << 8);
-}
-
 void RTP::processData(std::string data)
 {
 	//printf("packet:%d\n", sizeof(RTPPacket));
@@ -147,8 +154,43 @@ void RTP::processData(std::string data)
 	memcpy((void *)&rPack, data.c_str(), RTP_HEADER_SIZE);
 	//rPack.data = data;
 	rPack.payload = data.substr(RTP_HEADER_SIZE);
-	rPack.seqNum = swap(rPack.seqNum);
+	rPack.seqNum = swap16(rPack.seqNum);
+	rPack.timeStamp = swap32(rPack.timeStamp);
 	rtpPackets.push(std::move(rPack));
+	count++;
+	highSeq = MAX(highSeq, rPack.seqNum);
+	highTimeStamp = MAX(highTimeStamp, rPack.timeStamp);
+	mTimeList.push_back(rPack.timeStamp);
 	//fwrite(data.c_str() + sizeof(RTPPacket), data.length() - sizeof(RTPPacket), 1, fw.get());
     //printf("rtp data:%s\n", data.c_str());
+}
+
+UINT32 RTP::getPackCount()
+{
+	return count;
+}
+
+UINT16 RTP::getHighSeq()
+{
+	return highSeq;
+}
+
+UINT32 RTP::getJitter()
+{
+	if (mTimeList.size() < 2)
+	{
+		return 0;
+	}
+	UINT32 sumTime = mTimeList.back() - mTimeList.front();
+	UINT32 aver = sumTime / (mTimeList.size() - 1);
+	UINT32 variance = 0;
+	auto iter = mTimeList.begin();
+	UINT32 tmp = *iter;
+	for (iter++ ; iter != mTimeList.end(); iter++)
+	{
+		variance += (*iter - tmp) * (*iter - tmp);
+		tmp = *iter;
+	}
+	mTimeList.clear();
+	return variance / (mTimeList.size() - 1);
 }

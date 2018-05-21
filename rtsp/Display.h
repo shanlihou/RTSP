@@ -3,14 +3,7 @@
 #include <memory>
 #include <list>
 #include "util.h"
-struct MyPicture
-{
-	MyPicture();
-	MyPicture(MyPicture &&pict);
-	UINT32 width;
-	UINT32 height;
-	std::unique_ptr<UINT8[]> data;
-};
+#include "Decode.h"
 class Display
 {
 	PATTERN_SINGLETON_DECLARE(Display)
@@ -19,11 +12,15 @@ public:
 	void onTimer();
 	~Display();
 	void init();
+	void showTexture();
 
 private:
+	UINT32 loadTexture(UINT8 *pixels, int width, int height);
+
 	std::list<MyPicture> mPictList;
 	HANDLE mMutex;
 	HANDLE mThread;
 	//void timerFunc(int val);
+	UINT32 mTexID;
 	Display();
 };

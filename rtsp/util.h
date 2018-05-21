@@ -16,3 +16,5 @@ public:\
 	static className *getInstance();\
 private:\
 	static className *instance;
+
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
